@@ -51,7 +51,6 @@ class CNNEncoder(nn.Module):
                 x = self.cnn(x_3d[:, t, :, :, :])
                 x = torch.flatten(x, start_dim=1)
 
-            # 处理fc层
             x = self.fc(x)
 
             cnn_embedding_out.append(x)
@@ -70,9 +69,9 @@ class RNNDecoder(nn.Module):
         self.rnn_hidden_nodes = rnn_hidden_nodes
 
         self.drop_prob = drop_prob
-        self.num_classes = num_classes # 这里调整分类数目
+        self.num_classes = num_classes
 
-        # rnn配置参数
+        # rnn parameters
         rnn_params = {
             'input_size': self.rnn_input_features,
             'hidden_size': self.rnn_hidden_nodes,
@@ -80,7 +79,7 @@ class RNNDecoder(nn.Module):
             'batch_first': True
         }
 
-        # 使用lstm或者gru作为rnn层
+        # lstm or gru
         self.rnn = (nn.GRU if use_gru else nn.LSTM)(**rnn_params)
 
         # rnn层输出到线性分类器
@@ -98,6 +97,6 @@ class RNNDecoder(nn.Module):
         # rnn_out shape: (batch, timestep, output_size)
         # h_n and h_c shape: (n_layers, batch, hidden_size)
 
-        x = self.fc(rnn_out[:, -1, :]) # 只抽取最后一层做输出
+        x = self.fc(rnn_out[:, -1, :]) # only take the output of the last time step
 
         return x

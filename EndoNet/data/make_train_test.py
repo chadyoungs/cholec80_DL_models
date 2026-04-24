@@ -1,4 +1,8 @@
 import os
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent.parent))
 import shutil
 
 from tqdm import tqdm
@@ -10,9 +14,10 @@ import cv2
 
 import argparse
 
+from config import DATA_ROOT_DIR
 
 # default location of cholec80 dataset
-default_src_dir = r"/media/ExtHDD/cholec80"
+
 default_output_dir = r"/media/ExtHDD/cholec80_data"
 default_time_step = 25
 default_test_size = 0.5
@@ -21,8 +26,8 @@ default_shuffle = False
 default_label_dir = os.path.dirname(os.path.abspath(__file__))
 
 # for build the labels
-phase_label_files = os.path.join(default_src_dir, "phase_annotations")
-tool_label_files = os.path.join(default_src_dir, "tool_annotations")
+phase_label_files = os.path.join(DATA_ROOT_DIR, "phase_annotations")
+tool_label_files = os.path.join(DATA_ROOT_DIR, "tool_annotations")
 
 train_set_info_csv_loc = os.path.join(default_label_dir, "train_set_info.csv")
 test_set_info_csv_loc = os.path.join(default_label_dir, "test_set_info.csv")
@@ -36,7 +41,7 @@ def get_phase_label(video_name, frame_index):
 
 def dataset_split(src_dir=None, output_dir=None, time_step=None, size=None, shuffle=None):
     # default paras
-    src_dir = default_src_dir if src_dir is None else src_dir
+    src_dir = DATA_ROOT_DIR if src_dir is None else src_dir
     output_dir = default_output_dir if output_dir is None else output_dir
     time_step = default_time_step if time_step is None else default_time_step
     size = default_test_size if size is None else default_test_size

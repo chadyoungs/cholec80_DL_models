@@ -1,5 +1,5 @@
 # Pytorch-Video-Classification
-Make video classification on Cholec80  using CNN with Pytorch framework.
+Make video classification on Cholec80 using CNN with Pytorch framework.
 
 # Environments
 ```bash

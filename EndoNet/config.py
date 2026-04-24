@@ -1,3 +1,7 @@
+
+# data
+DATA_ROOT_DIR = r"/mnt/sdc/cholec80"
+
 img_w = 224
 img_h = 224
 
