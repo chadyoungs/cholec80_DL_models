@@ -1,8 +1,9 @@
 ## cholec80_DL_models
 
-### 1. EndoNet
-- (EndoNet: A Deep Architecture for Recognition Tasks on Laparoscopic Videos
-)[https://arxiv.org/abs/1602.03012]
+### 1. EndoNet - Pytorch
+- [EndoNet: A Deep Architecture for Recognition Tasks on Laparoscopic Videos
+(https://arxiv.org/abs/1602.03012)
+- EndoNet was a combined Net for Tool and Phase Recognition in surgery
 
 ### 2. CycleGAN
 - Code is copied from [Pytorch-CycleGAN](https://github.com/aitorzip/PyTorch-CycleGAN)
