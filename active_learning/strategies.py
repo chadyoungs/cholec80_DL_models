@@ -340,7 +340,7 @@ class BADGEStrategy(BaseStrategy):
     k-means++ seeding is then applied to the embedding space to select a
     *diverse* batch that also covers high-gradient (uncertain) regions.
 
-    Memory: the raw embedding is 7 × 4103 = 28 721-dim.  PCA is applied
+    Memory: the raw embedding is 7 × 4103 = 28,721-dim.  PCA is applied
     automatically when *pca_dim* > 0 to keep memory manageable.
 
     Reference: Ash et al., ICLR 2020.
@@ -377,7 +377,7 @@ class BADGEStrategy(BaseStrategy):
             for X, _, _ in tqdm(dataloader, desc='  BADGE embeddings', leave=False):
                 X  = X.to(self.device)
                 feats, tool_logits = self.model1(X)
-                combined  = torch.cat([feats, tool_logits], dim=1)   # (B, 4103)
+                combined = torch.cat([feats, tool_logits], dim=1)   # (B, 4096+7=4103)
                 phase_log = self.model2(combined)
                 probs     = torch.softmax(phase_log, dim=1)           # (B, C)
                 pred      = probs.argmax(dim=1)                       # (B,)

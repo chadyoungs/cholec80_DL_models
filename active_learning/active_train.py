@@ -15,13 +15,13 @@ Results are written to JSON for later comparison across strategies.
 Usage
 -----
 # from the active_learning/ directory
-python active_train.py \\
-    --train_csv  /path/to/EndoNet/train_set_info.csv \\
-    --test_csv   /path/to/EndoNet/test_set_info.csv  \\
-    --strategy   entropy                              \\
-    --n_rounds   10                                   \\
-    --query_budget 200                                \\
-    --epochs_per_round 20                             \\
+python active_train.py \
+    --train_csv  /path/to/EndoNet/train_set_info.csv \
+    --test_csv   /path/to/EndoNet/test_set_info.csv  \
+    --strategy   entropy                              \
+    --n_rounds   10                                   \
+    --query_budget 200                                \
+    --epochs_per_round 20                             \
     --output_dir ./results
 
 Supported strategies (--strategy):
