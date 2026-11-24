@@ -9,8 +9,8 @@ import pytest
 import torch
 from torch import nn
 
-from cholec80.engine import CheckpointManager
-from cholec80.utils import CSVLogger, build_optimizer, count_parameters, load_checkpoint, save_checkpoint
+from cholec80_dl.engine import CheckpointManager
+from cholec80_dl.utils import CSVLogger, build_optimizer, count_parameters, load_checkpoint, save_checkpoint
 
 
 class TinyModel(nn.Module):

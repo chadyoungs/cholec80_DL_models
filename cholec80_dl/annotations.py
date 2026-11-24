@@ -12,7 +12,7 @@ The generated index is a machine-independent CSV (paths are stored relative to
 
     video, frame, path, phase, Grasper, Bipolar, Hook, Scissors, Clipper, Irrigator, SpecimenBag
 
-``phase`` is an integer class id (see :data:`cholec80.constants.PHASES`).
+``phase`` is an integer class id (see :data:`cholec80_dl.constants.PHASES`).
 """
 
 from __future__ import annotations

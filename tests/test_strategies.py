@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from cholec80.active_learning import STRATEGIES, CandidateSet, query_indices
+from cholec80_dl.active_learning import STRATEGIES, CandidateSet, query_indices
 
 
 @pytest.fixture()

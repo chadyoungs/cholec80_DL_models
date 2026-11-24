@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 import pytest
 
-from cholec80.annotations import (
+from cholec80_dl.annotations import (
     PHASES,
     TOOLS,
     build_index,

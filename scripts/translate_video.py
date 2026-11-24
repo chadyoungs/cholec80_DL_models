@@ -49,10 +49,10 @@ from torchvision.transforms import functional as TF
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from cholec80.engine import autocast  # noqa: E402
-from cholec80.models import Generator  # noqa: E402
-from cholec80.sim2real import blend_protected, compute_flow, flow_occlusion_mask, to_uint8_frames, warp_images  # noqa: E402
-from cholec80.utils import describe_device, resolve_device, set_seed  # noqa: E402
+from cholec80_dl.engine import autocast  # noqa: E402
+from cholec80_dl.models import Generator  # noqa: E402
+from cholec80_dl.sim2real import blend_protected, compute_flow, flow_occlusion_mask, to_uint8_frames, warp_images  # noqa: E402
+from cholec80_dl.utils import describe_device, resolve_device, set_seed  # noqa: E402
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 VIDEO_SUFFIXES = {".mp4", ".avi", ".mov", ".mkv"}

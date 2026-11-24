@@ -71,11 +71,11 @@ from torchvision.utils import save_image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from cholec80.data import Sim2RealDataset  # noqa: E402
-from cholec80.engine import autocast, make_amp  # noqa: E402
-from cholec80.models import Discriminator, Generator, ReplayBuffer, linear_decay_lambda, weights_init_normal  # noqa: E402
-from cholec80.sim2real import batch_flow_and_validity, blend_protected, warp_images  # noqa: E402
-from cholec80.utils import CSVLogger, AverageMeter, describe_device, dump_json, make_run_dir, resolve_device, set_seed  # noqa: E402
+from cholec80_dl.data import Sim2RealDataset  # noqa: E402
+from cholec80_dl.engine import autocast, make_amp  # noqa: E402
+from cholec80_dl.models import Discriminator, Generator, ReplayBuffer, linear_decay_lambda, weights_init_normal  # noqa: E402
+from cholec80_dl.sim2real import batch_flow_and_validity, blend_protected, warp_images  # noqa: E402
+from cholec80_dl.utils import CSVLogger, AverageMeter, describe_device, dump_json, make_run_dir, resolve_device, set_seed  # noqa: E402
 
 
 def parse_args(argv=None):

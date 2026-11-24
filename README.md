@@ -1,44 +1,54 @@
 # Cholec80 deep-learning pipelines
 
-Cholec80 腹腔镜胆囊切除视频的四个任务，全部重写成一套共享代码：
+Modern, runnable PyTorch code for the Cholec80 laparoscopic cholecystectomy
+dataset. One shared package (`cholec80_dl/`), one CLI per task, no duplicated
+implementations.
 
-| 任务 | 模型 | 入口 |
+| Task | Model | Entry point |
 | --- | --- | --- |
-| 7 类手术阶段 + 7 种器械多标签 | EndoNet（CNN + 双头），可选 BiLSTM 时序版 | `scripts/train_endonet.py` |
-| 片段级阶段/器械识别 | SlowFast（3D 双路径，ImageNet 膨胀初始化） | `scripts/train_slowfast.py` |
-| 主动学习（少标注选帧） | 7 种 query 策略，warm-start 跨轮训练 | `scripts/train_active.py` |
-| 无配对域迁移 / 器械分割 | CycleGAN；GroundingDINO + SAM | `scripts/train_cyclegan.py`、`scripts/segment_instruments.py` |
-| 仿真→真实纹理迁移（sim2real） | CycleGAN + 器械 mask 保护 + 光流时序一致性 | `scripts/train_sim2real.py`、`scripts/translate_video.py` |
+| Phase (7-way) + tool (7-way multi-label) recognition, frame level | EndoNet: CNN backbone + dual heads | `scripts/train_endonet.py` |
+| Phase recognition with temporal context | EndoNet + BiLSTM over frame sequences | `scripts/train_endonet.py --temporal lstm` |
+| Clip-level phase / tool recognition | SlowFast (3-D two-pathway, ImageNet inflation) | `scripts/train_slowfast.py` |
+| Label-efficient training (active learning) | 7 query strategies, warm-start rounds | `scripts/train_active.py` |
+| Sim-to-real texture transfer (also plain unpaired domain transfer) | CycleGAN + instrument-mask protection + flow temporal consistency | `scripts/train_sim2real.py`, `scripts/translate_video.py` |
+| Instrument detection / segmentation | GroundingDINO + SAM | `scripts/segment_instruments.py` |
 
-`EndoNet/`、`SlowFast/`、`CycleGAN/`、`active_learning/` 四个旧目录**原样保留**，只作为对照参考（它们跑不起来，见文末清单）。真正能用的是 `cholec80/` 包 + `scripts/`，确认不需要旧代码后可以直接删掉那四个目录。
+Supporting CLIs: `prepare_dataset.py` (frames + index CSVs), `evaluate.py`
+(metrics + raw-video inference), `smoke_test.py` (synthetic end-to-end check).
 
-## 1. 环境（venv，服务器通用）
+The original exploratory folders (`EndoNet/`, `SlowFast/`, `CycleGAN/`,
+`active_learning/`) were removed after being fully audited and rewritten;
+they remain recoverable from git history (commit `034f0ea` and earlier).
+A summary of the bugs found in them is kept at the bottom of this README.
+
+## 1. Environment (venv)
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 
-# GPU 机器先按 CUDA 版本装 torch（示例 cu121，按需换成 cu118/cu124）
+# On a GPU server, install torch for your CUDA version first (example: cu121)
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
-pip install -e .            # 装本仓库（纯 Python，秒级）
-pip install -e '.[dev]'     # 加 pytest
+pip install -e '.[dev]'     # this repo + pytest
 ```
 
-或者直接跑 `bash setup.sh`（见第 7 节）。CPU 也能跑（`--device cpu`、`--no-amp`），但训练没意义，只用于自检。
+Or simply `bash setup.sh` (set `TORCH_INDEX_URL` for GPU wheels).
+CPU works for the self-checks (`--device cpu --no-amp`) but not for real training.
 
-不依赖 timm / scipy / sklearn：AP、PCA（随机投影）、k-center 距离、混淆矩阵都是 numpy 手写，省掉一堆编译型依赖。
+No timm / scipy / sklearn dependencies: average precision, random-projection
+PCA, k-center distances and confusion matrices are implemented in plain numpy.
 
-## 2. 数据准备
+## 2. Dataset preparation
 
-原始数据按官方布局放好即可，不需要手工做 CSV：
+Place the official Cholec80 release as-is; no manual CSV building:
 
 ```
 data/cholec80/
 ├── videos/video01.mp4 ... video80.mp4
-├── phase_annotations/video01-phase.txt     # Frame, Phase（25 fps 每帧一行）
-└── tool_annotations/video01-tool.txt       # Frame, 7 个器械列（1 fps）
+├── phase_annotations/video01-phase.txt     # Frame, Phase (one row per frame, 25 fps)
+└── tool_annotations/video01-tool.txt       # Frame, 7 tool columns (1 fps)
 ```
 
 ```bash
@@ -46,36 +56,49 @@ python scripts/prepare_dataset.py \
     --root data/cholec80 --stride 25 --size 256 --crop square --workers 8
 ```
 
-产出：
+Outputs:
 
-- `data/frames/<video>/<frame:06d>.jpg`：按 stride 抽帧（stride 25 = 1 fps），默认方形裁切+缩放到 256，JPEG q92；
-- `data/index/{train,val,test}.csv`：列 `video,frame,path,phase,Grasper,...,SpecimenBag`，`path` 是**相对**路径（`video01/000000.jpg`），换机器不用改表；
-- `data/index/split.json`：split 明细 + 每个 split 的帧数、各 phase/器械计数，用来一眼看出类别不平衡。
+- `data/frames/<video>/<frame:06d>.jpg` — extracted frames (stride 25 = 1 fps),
+  square-cropped and resized to 256 by default, JPEG q92;
+- `data/index/{train,val,test}.csv` — columns
+  `video,frame,path,phase,Grasper,...,SpecimenBag`; `path` is **relative**
+  (`video01/000000.jpg`), so the index is machine-independent;
+- `data/index/split.json` — split membership plus per-split frame counts and
+  phase/tool histograms (instant class-imbalance overview).
 
-划分口径：`--protocol ordered`（默认）按视频序号切，前 40 个训练、后 40 个测试（EndoNet 论文口径），再从训练视频里切 `--val-ratio 0.1` 做验证集，保证 val/test 不重叠；`--protocol random` 用 `--seed` 随机切。
+Split protocol: `--protocol ordered` (default) splits by video number — first
+40 videos for training, last 40 for testing (the EndoNet paper protocol) — then
+carves `--val-ratio 0.1` of the training videos into a validation set, so val
+and test never overlap. `--protocol random` shuffles with `--seed`.
 
-## 3. EndoNet：阶段 + 器械
+## 3. Phase + tool recognition (EndoNet)
 
 ```bash
-# 帧级（默认 resnet50 backbone，ImageNet 预训练）
+# Frame level (resnet50 backbone, ImageNet pretrained by default)
 python scripts/train_endonet.py --epochs 30 --batch-size 64 --workers 8
 
-# 时序版：连续 16 帧 → BiLSTM → 每个时间步都算 phase loss
+# Temporal variant: 16 consecutive frames -> BiLSTM -> phase loss at every step
 python scripts/train_endonet.py --temporal lstm --seq-len 16 --seq-stride 4 \
     --rnn-hidden 256 --rnn-layers 2 --name endonet-lstm
 ```
 
-关键点：
+Design notes:
 
-- 模型只输出 **logits**，`BCEWithLogitsLoss` + `CrossEntropyLoss`，器械 `pos_weight` 和 phase class weight 都从 **train CSV** 统计（不会泄漏 val/test）；
-- phase 头输入是 `[features, sigmoid(tool_logits)]`，沿用 EndoNet 论文的 4103 维设计，维度由 backbone 自动推导；
-- `--freeze-epochs 1` 先线性探测，冻结期 backbone 置 eval，BN 统计不被污染；
-- CUDA 上默认 AMP，AdamW + backbone 单独 lr 系数，warmup-cosine，梯度裁剪，early stopping 按 `--monitor`；
-- `--no-pretrained` 完全离线可跑（做 ablation 或没网时用）。
+- Models emit **logits only**; losses are `BCEWithLogitsLoss` (tools) +
+  `CrossEntropyLoss` (phases). Tool `pos_weight` and phase class weights are
+  estimated from the **train CSV only** (no val/test leakage).
+- The phase head consumes `[features, sigmoid(tool_logits)]`, following the
+  EndoNet paper's 4103-d design; the width is derived from the backbone.
+- `--freeze-epochs 1` runs a linear-probe warm-up; the frozen backbone is kept
+  in eval mode so its BatchNorm statistics are not polluted.
+- AMP on CUDA, AdamW with a separate backbone LR multiplier, warmup-cosine
+  schedule, gradient clipping, early stopping on `--monitor`.
+- `--no-pretrained` runs fully offline (ablations / no network).
 
-## 4. SlowFast：片段级
+## 4. Clip-level recognition (SlowFast)
 
-时序模型需要更密的采样。建议**另建一套 5 fps 的索引**（1 fps 只能看 1 秒一帧，慢路径几乎没运动信息）：
+Temporal models need denser sampling. Build a second, 5-fps index (at 1 fps
+the slow pathway sees almost no motion):
 
 ```bash
 python scripts/prepare_dataset.py --root data/cholec80 --stride 5 --size 256 \
@@ -85,76 +108,96 @@ python scripts/train_slowfast.py --index-dir data/index_5fps --frames-dir data/f
     --clip-len 32 --tau 8 --alpha 4 --batch-size 8 --epochs 20
 ```
 
-- 通道算术与论文一致（slow `64/256/512/1024/2048`，fast 为 1/8 宽度，按 `beta_inv` 调）；
-- 默认用 ImageNet ResNet-50 的 2D 卷积核沿时间维膨胀初始化 slow 和 fast 两条路径（`--no-inflate` 关闭；无网时加 `--no-inflate`）；
-- 每个 clip 的 JPEG 只解码一次，slow 视图从 fast 帧里按索引取子集；
-- clip 太长而视频不够时会把 `clip_len` 自动缩到最长视频的整数倍并 warning（小数据集/自检不会直接报 0 样本）。
+- Channel schedule follows the paper (slow `64/256/512/1024/2048`, fast at
+  1/`beta_inv` width).
+- By default both pathways are initialised by inflating ImageNet ResNet-50
+  2-D kernels along time (`--no-inflate` to disable; required when offline).
+- Each JPEG in a clip is decoded exactly once; the slow view is an index
+  subset of the fast frames.
+- If clips are longer than the videos, `clip_len` shrinks to a multiple of
+  the fast step that fits the longest video (with a warning) instead of
+  producing an empty dataset.
 
-## 5. 主动学习
+## 5. Active learning
 
 ```bash
 python scripts/train_active.py --strategy entropy --n-rounds 8 --query-budget 200 \
     --initial-ratio 0.05 --epochs-per-round 5 --batch-size 32
 ```
 
-可用策略：`random`、`least_confidence`、`margin`、`entropy`、`coreset`、`badge`、`mc_dropout`（BALD）。
+Strategies: `random`, `least_confidence`, `margin`, `entropy`, `coreset`,
+`badge`, `mc_dropout` (BALD).
 
-- 每轮只在**未标注池**上跑一次前向，缓存 probs/features 供策略使用，不重复推理；
-- 默认 **warm start**（跨轮复用权重），`--fresh-model` 才是每轮冷启动（复现旧实现的口径）；
-- 选 best 看**验证集**，不看训练集；
-- 初始标注集 `balance_initial` 保证每个 phase 至少一帧，避免小池子某类永远学不到；
-- BADGE 的梯度嵌入先用随机投影降到 64 维再 k-means++，这是**文档化的近似**，不是原论文精确式（原式 7×4103 维内存不可行）；
-- coreset 在 query 时只用 labeled 集特征，分块算距离，不 O(N·L) 爆内存。
+- One cached forward pass over the **unlabeled pool** per round; strategies
+  operate on the cached probs/features (no repeated inference).
+- **Warm start** across rounds by default; `--fresh-model` re-initialises
+  every round (cold-start ablation).
+- Best-model selection uses the **validation** set, never the training set.
+- The initial labeled set is phase-balanced (at least one frame per phase).
+- BADGE projects gradient embeddings to 64 dims with a random projection
+  before k-means++ — a documented approximation (the exact 7x4103-d
+  embedding is memory-infeasible).
+- Core-set greedy k-center uses chunked numpy distances against labeled
+  features only.
 
-结果：`runs/al-<strategy>-<tag>_<时间戳>/curve.csv`（每轮标注量、query 耗时、val 指标）+ `final.pt`。
+Output: `runs/al-<strategy>-<tag>_<ts>/curve.csv` (labels per round, query
+time, val metrics) + `final.pt`.
 
-## 6. 评估、推理、CycleGAN、分割
+## 6. Sim-to-real texture transfer
 
-```bash
-# test split 全量指标 + 逐视频
-python scripts/evaluate.py --checkpoint runs/endonet_20260101-120000/checkpoints/best.pt --split test
+Give simulated organs a real-tissue look. Domain A = simulated frames,
+domain B = real frames (Cholec80 frames from `prepare_dataset.py` work
+directly). Two surgery-specific guards on top of CycleGAN:
 
-# 直接吃原始视频（滑窗抽帧，输出每帧 phase 概率和 7 个器械概率）
-python scripts/evaluate.py --checkpoint runs/endonet_.../checkpoints/best.pt \
-    --video data/cholec80/videos/video71.mp4
-```
-
-`evaluate.py` 从 checkpoint 的 `model_config` 重建模型（`pretrained=False`，不联网），自动识别 frame/temporal/SlowFast 三种输出。
-
-CycleGAN（无配对域迁移，例如把 A 中心的画质迁移到 B 中心）：
-
-```bash
-python scripts/train_cyclegan.py --a-dir data/frames/video01 --b-dir data/frames/video02 \
-    --epochs 100 --decay-epoch 50 --size 256 --batch-size 4 --lambda-cycle 10 --lambda-identity 5
-```
-
-去掉 Visdom，改成 `samples/epoch_XXX.jpg` 网格 + `metrics.csv`，无头服务器可用；`--resume` 续训。
-
-### 6.1 仿真→真实纹理迁移（sim2real）
-
-给仿真器官加"血肉感"：A 域 = 仿真帧，B 域 = 真实帧（Cholec80 抽好的帧直接可用）。相对 vanilla CycleGAN 多两个手术专用保护：
-
-- **器械/语义 mask 保护**：仿真器导出的器械 mask（白色=保护）在每次生成后把原像素贴回，生成器在保护区零梯度，语义标签不被翻译污染；
-- **光流时序一致性**：相邻两帧的翻译结果经 Farneback 光流对齐后做 L1 约束（带 forward-backward 遮挡检测），抑制逐帧闪烁。
+- **Instrument / semantics protection**: simulator-exported masks
+  (white = protect) composite the original pixels back over every
+  translation. The generator gets zero gradient on protected pixels, so
+  semantic labels stay valid.
+- **Flow-based temporal consistency**: translations of consecutive frames
+  are aligned with Farneback optical flow (with forward-backward occlusion
+  checking) and matched with an L1 loss — suppresses per-frame flicker.
 
 ```bash
-# 训练（mask 目录镜像 a-dir 的相对路径，.png，白=保留原像素）
+# Train (mask dir mirrors a-dir layout, .png, white = keep original pixels)
 python scripts/train_sim2real.py \
     --a-dir data/sim/frames --b-dir data/frames \
     --a-mask-dir data/sim/instrument_masks \
     --temporal-weight 2.0 --epochs 100 --size 256 --batch-size 4
 
-# 推理：图片目录或原始视频，可选 mask 贴回 + 光流引导的时域平滑
+# Translate an image folder or a raw video
 python scripts/translate_video.py \
     --checkpoint runs/sim2real_<ts>/checkpoints/last.pt \
-    --input data/sim/frames/video01 --out-dir output/translated \
-    --mask-dir data/sim/instrument_masks/video01 \
+    --input data/sim/videos/run01.mp4 --out-dir output/translated \
     --temporal-smooth 0.5 --side-by-side --write-video
 ```
 
-学习入口：`cholec80/sim2real.py`（每个函数都有原理级英文注释：为什么 LSGAN、cycle 为什么防幻觉、backward warping 的坐标约定、forward-backward 遮挡检测）、`scripts/train_sim2real.py` 顶部有四个 loss 的完整推导说明。单测 `tests/test_sim2real.py` 用零光流=恒等、纯平移光流、mask 对齐等精确断言验证这些数学性质。
+Omit `--a-mask-dir` and `--temporal-weight` and this is exactly a plain
+CycleGAN trainer — it is the single image-translation entry point in this
+repo (there is no separate `train_cyclegan.py`).
 
-器械分割（可选，需额外依赖）：
+Learning path: read the loss derivations at the top of
+`scripts/train_sim2real.py`, then `cholec80_dl/sim2real.py` (principle-level
+comments on LSGAN, cycle consistency, backward warping conventions and
+forward-backward occlusion checks), then the dataset and inference script.
+`tests/test_sim2real.py` verifies the math with exact assertions
+(zero-flow warp = identity, pure-translation flow, mask alignment).
+
+## 7. Evaluation and inference
+
+```bash
+# Full test-split metrics + per-video accuracy / Jaccard
+python scripts/evaluate.py --checkpoint runs/endonet_<ts>/checkpoints/best.pt --split test
+
+# Raw-video inference: per-frame phase probabilities + 7 tool probabilities
+python scripts/evaluate.py --checkpoint runs/endonet_<ts>/checkpoints/best.pt \
+    --video data/cholec80/videos/video71.mp4
+```
+
+`evaluate.py` rebuilds the model from the checkpoint's `model_config`
+(`pretrained=False`, no downloads) and handles frame / temporal / SlowFast
+outputs automatically.
+
+## 8. Instrument segmentation (optional)
 
 ```bash
 pip install -e '.[seg]'
@@ -162,88 +205,114 @@ python scripts/segment_instruments.py --input data/cholec80/videos --out-dir out
     --stride 25 --prompt "surgical instrument . grasper . hook . scissors . clipper"
 ```
 
-输出 `mask/`、`foreground/`、可选 `background/` 和 `meta.jsonl`（每帧 prompt、box、score），替代旧 `CycleGAN/data_prepared.py` 那段写死路径的 DINO+SAM 脚本。
+Outputs `mask/`, `foreground/`, optional `background/`, and `meta.jsonl`
+(per-frame prompts, boxes, scores). Requires HuggingFace weight downloads.
 
-## 7. 在服务器上跑：自检顺序
+## 9. Server runbook
 
 ```bash
-bash setup.sh                       # 建 venv + 装依赖（GPU 机器设 TORCH_INDEX_URL）
-
-pytest                              # 40 个单测：标注解析、三种 Dataset、模型前向、指标、AL 策略、ckpt
-python scripts/smoke_test.py        # 合成 6 个视频，串跑 5 个 CLI，约 2-3 分钟，CPU 即可
-python scripts/smoke_test.py --skip-slowfast
+bash setup.sh                       # venv + deps (set TORCH_INDEX_URL on GPU)
+pytest                              # 50 unit tests
+python scripts/smoke_test.py        # synthetic 6-video end-to-end check (~2 min, CPU)
 ```
 
-`smoke_test` 会依次跑 `prepare_dataset → train_endonet → evaluate → train_active → train_slowfast`，任何一个 CLI 参数/接口对不上都会立刻暴露，跑通再去下真数据。
+The smoke test chains `prepare_dataset -> train_endonet -> evaluate ->
+train_active -> train_slowfast` on synthetic data, so any CLI/interface
+breakage surfaces before you download the real dataset.
 
-真数据上的建议参数（单卡 24 GB 量级）：
+Suggested settings (single 24 GB GPU):
 
-| | batch | workers | 说明 |
+| Run | batch | workers | Notes |
 | --- | --- | --- | --- |
-| EndoNet frame | 64 | 8–16 | 224px，AMP，~1.5 h/epoch 取决于磁盘 |
-| EndoNet temporal | 16 (×16 帧) | 8 | 显存约 4×帧级；`--seq-len 16` 起 |
-| SlowFast | 8–16 | 8 | 32×224² clip；显存 ~12 GB @ 8 |
-| CycleGAN | 4–8 | 4 | 256px，9 blocks |
+| EndoNet frame | 64 | 8–16 | 224 px, AMP |
+| EndoNet temporal | 16 (x16 frames) | 8 | ~4x frame-level memory |
+| SlowFast | 8–16 | 8 | 32x224² clips, ~12 GB @ 8 |
+| Sim2real / CycleGAN | 4–8 | 4 | 256 px, 9 residual blocks |
 
-其他服务器注意事项：
+Operational notes:
 
-- 目前是**单卡**实现（`nn.DataParallel` 都不用），多卡请自行扩展，代码里没有 DDP 分支；
-- 抽帧是 CPU/IO 密集，`--workers` 别超过 CPU 核数的一半，否则 JPEG 解码互相抢；
-- 中断续训：所有训练脚本支持 `--resume runs/<name>_<ts>/checkpoints/last.pt`；
-- 每个 run 目录都有 `args.json`（完整参数）+ `metrics.csv`（逐 epoch）+ `checkpoints/{last,best}.pt` + `test_metrics.json`，comparison 不用再靠记忆；
-- 不做 deterministic 强制，需要严格复现实验自己加 `torch.use_deterministic_algorithms`。
+- Single-GPU implementation (no DDP branch, no DataParallel).
+- Frame extraction is CPU/IO bound; keep `--workers` below half the core count.
+- Every training script supports `--resume runs/<name>_<ts>/checkpoints/last.pt`.
+- Every run directory contains `args.json`, `metrics.csv`,
+  `checkpoints/{last,best}.pt` and `test_metrics.json` — experiments are
+  comparable without guesswork.
+- Deterministic algorithms are not forced; add
+  `torch.use_deterministic_algorithms` yourself if you need bit-exact reruns.
 
-## 8. 旧代码的问题（已在新实现里修掉）
+## 10. Repository layout
+
+```
+cholec80_dl/              # the single runnable implementation
+├── constants.py          # 7 phases / 7 tools ordering, fps conventions
+├── annotations.py        # TSV parsing, frame extraction, index, splits
+├── data/                 # FrameDataset / SequenceDataset / ClipDataset / Sim2RealDataset
+├── models/               # endonet / slowfast / cyclegan / backbone wrapper
+├── active_learning/      # 7 strategies + labeled pool
+├── sim2real.py           # mask blending, optical-flow warping, occlusion checks
+├── engine.py             # AMP, schedulers, CheckpointManager, resume
+├── metrics.py            # confusion matrix, hand-written AP/mAP, video Jaccard
+├── evaluation.py  inference.py  losses.py  utils.py
+scripts/                  # one CLI per task, uniform run artifacts
+tests/                    # pytest (50 cases)
+licenses/                 # third-party licenses (CycleGAN reference: GPLv3)
+```
+
+## 11. Known limitations
+
+- No DDP / multi-GPU; no TensorBoard dependency (plot `metrics.csv` yourself).
+- BADGE is an approximation; core-set is greedy k-center, not exact.
+- `evaluate.py` gives aggregate metrics for SlowFast; per-video / raw-video
+  inference currently supports frame-level models only.
+- `segment_instruments.py` needs `transformers` and network access to
+  HuggingFace weights.
+- The CycleGAN generator/discriminator derive from the GPLv3
+  PyTorch-CycleGAN reference (license kept in `licenses/`); keep that in
+  mind when redistributing.
+
+## Appendix: bugs found in the original code (all fixed in this rewrite)
 
 `EndoNet/`
 
-- `config.py` 里根本没有 `phase_label_in_csv`、`threshold`、`cnn_encoder_params`、`rnn_decoder_params`，`train.py`/`eval.py` 引用即 AttributeError；`eval.py` 还 import 不存在的 `CNNEncoder`；
-- checkpoint 保存时 `model2_state_dict` 存的是 model1 的权重，`optimizer2_state_dict` 存的是 optimizer1，恢复后两个头互相污染；
-- 训练 `shuffle=False`；验证对 model1 前向两次；训练用 `MultiLabelSoftMarginLoss`、验证用 `BCELoss`，指标口径不一致；criterion 在 batch 循环里每步新建；
-- `model.py` 的 AlexNet 在 forward 里就 `sigmoid`，再喂 `MultiLabelSoftMarginLoss`（内部又 sigmoid），损失基本失效；`EasyFCNet` 硬编码 4103；
-- `dataloader.py` 每次 `__getitem__` 重建 `transforms.Compose`，硬编码裁 `(50,0,804,480)`，`use_mem` 死代码；
-- `utils.py` 用 `DataFrame.append`（pandas 2+ 已删）、`plotting` 里 `plt` 未导入；
-- `data/make_train_test.py`：`default_src_dir` 未定义、`size=0.5` 覆盖命令行、`get_phase_label` 每帧扫全表（O(n²)）、建目录逻辑反了、末尾 `input()` 阻塞；
-- `data/`、`test/` 两个子目录是从手势识别项目抄来的残稿（`gesture_classes`、`super_trail_count` 在 Cholec80 里不存在），已整体丢弃。
+- Referenced config keys that never existed (`phase_label_in_csv`,
+  `threshold`, `cnn_encoder_params`, `rnn_decoder_params`) → AttributeError;
+  `eval.py` imported a non-existent `CNNEncoder`.
+- Checkpointing saved model1's weights under `model2_state_dict` and
+  optimizer1 under `optimizer2_state_dict` — restoring corrupted both heads.
+- Training loader had `shuffle=False`; validation ran model1 twice; training
+  used `MultiLabelSoftMarginLoss` while validation used `BCELoss`; the
+  criterion was re-created inside the batch loop.
+- AlexNet applied `sigmoid` in `forward` and then fed a sigmoid-internal
+  loss (double sigmoid); `EasyFCNet` hard-coded 4103.
+- The dataloader rebuilt `transforms.Compose` on every `__getitem__`,
+  hard-coded a `(50,0,804,480)` crop, and carried dead code.
+- `utils.py` used `DataFrame.append` (removed in pandas 2+); `plotting`
+  referenced an unimported `plt`.
+- `data/make_train_test.py`: undefined `default_src_dir`, `size=0.5`
+  overriding the CLI, O(n²) per-frame label lookup, inverted directory
+  creation logic, and a blocking `input()`.
+- `data/` and `test/` subfolders were leftovers from a hand-gesture project
+  (`gesture_classes`, `super_trail_count` — meaningless for Cholec80).
 
 `SlowFast/`
 
-- 没有训练脚本，只有 model + dataloader；
-- 用 `os.path.dirname(file_loc)` 分组，同一 split 所有视频被当成一段，clip 跨视频；
-- 按字符串排序，`video01_1000.jpg` 排在 `video01_100.jpg` 前面，时序错乱；
-- `int(center["Phase"])` 取的列在 EndoNet CSV 里不存在（那里是 `label` 或 7 个 one-hot 列）；
-- 每样本解码 40 张 JPEG 且 slow/fast 各解一遍。
+- No training script at all.
+- Grouped clips by `os.path.dirname(file_loc)` → all videos in a split were
+  treated as one sequence; clips crossed video boundaries.
+- Lexical frame sorting put `video01_1000.jpg` before `video01_100.jpg`.
+- Read a `Phase` column that does not exist in the EndoNet CSVs.
+- Decoded 40 JPEGs per sample, twice (once per pathway).
 
 `CycleGAN/`
 
-- `Variable`、Visdom 依赖（无头服务器直接挂）；`--epoch` 其实是起始 epoch；`output/` 不自动创建；无 AMP、无 resume；
-- `data_prepared.py`（592 行）把 dataset 路径写死 `/mnt/sdc/...`，`batch_size` 收了不用，`save_segmentation_results` 把 scores/text_labels 丢掉，无 CLI。
+- `Variable`, Visdom dependency (breaks headless servers); `--epoch` was
+  actually the start epoch; `output/` was never created; no AMP, no resume.
+- `data_prepared.py` (592 lines) hard-coded `/mnt/sdc/...` paths, ignored its
+  `batch_size` argument, dropped scores/text labels, and had no CLI.
 
 `active_learning/`
 
-- 依赖上面不存在的 config 键；每轮重建模型（丢 warm start）；按**训练集**准确率选 best；coreset 在 query 时用 `shuffle=True` 的 labeled loader；BADGE 原始嵌入 7×4103=28721 维，内存不可行。
-
-## 9. 目录
-
-```
-cholec80/                 # 唯一可运行实现
-├── constants.py          # 7 phase / 7 tool 顺序、fps 约定
-├── annotations.py        # TSV 解析、抽帧、索引、split
-├── data/                 # FrameDataset / SequenceDataset / ClipDataset / CycleGAN dataset
-├── models/               # endonet / slowfast / cyclegan / backbone 包装
-├── active_learning/      # 7 种策略 + 标注池
-├── engine.py             # AMP、scheduler、CheckpointManager、resume
-├── metrics.py            # 混淆矩阵、手写 AP/mAP、视频级 Jaccard
-├── evaluation.py inference.py losses.py utils.py
-scripts/                  # 全部 CLI，统一 args.json / metrics.csv 产物
-tests/                    # pytest
-EndoNet/ SlowFast/ CycleGAN/ active_learning/   # legacy，仅对照
-```
-
-## 10. 已知限制
-
-- 无 DDP/多卡，无 TensorBoard 依赖（要曲线自己读 `metrics.csv`）；
-- BADGE 是近似实现；coreset 是贪心 k-center，非精确解；
-- `evaluate.py` 对 SlowFast 只给聚合指标，逐视频/原始视频推理目前只支持帧级模型；
-- `segment_instruments.py` 需要 `transformers` 且要能下 HuggingFace 权重，跑不通先检查网络和 `.[seg]` 是否装上；
-- 旧目录不参与打包（`pyproject.toml` 只收 `cholec80*`）。
+- Depended on the non-existent config keys above; rebuilt the model every
+  round (losing warm start); selected the best model by **training**
+  accuracy; core-set queried a `shuffle=True` labeled loader; BADGE used the
+  full 7x4103 = 28721-d embedding (memory-infeasible).

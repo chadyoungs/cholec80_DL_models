@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cholec80-dl"
-version = "0.2.0"
+version = "0.3.0"
 description = "Modern PyTorch pipelines for the Cholec80 surgical-video dataset: EndoNet (phase + tool), SlowFast (clip), CycleGAN (domain transfer), active learning."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,7 +27,7 @@ plot = ["matplotlib>=3.7"]
 log = ["tensorboard>=2.15"]
 
 [tool.setuptools.packages.find]
-include = ["cholec80*"]
+include = ["cholec80_dl*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

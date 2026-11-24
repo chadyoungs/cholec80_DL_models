@@ -9,8 +9,8 @@ import pandas as pd
 import torch
 from PIL import Image
 
-from cholec80.data import ClipDataset, FrameDataset, SequenceDataset, collate_clips, collate_frames, collate_sequences
-from cholec80.constants import TOOLS
+from cholec80_dl.data import ClipDataset, FrameDataset, SequenceDataset, collate_clips, collate_frames, collate_sequences
+from cholec80_dl.constants import TOOLS
 
 
 def _make_frames(root: Path, videos: dict[str, int], size: int = 64) -> None:

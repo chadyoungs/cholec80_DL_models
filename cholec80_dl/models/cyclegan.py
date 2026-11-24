@@ -2,8 +2,10 @@
 
 Based on Zhu et al., "Unpaired Image-to-Image Translation using Cycle-Consistent
 Adversarial Networks" (ICCV 2017), following the reference implementation used
-by the previous ``CycleGAN/`` folder -- rewritten without ``Variable`` or
-Visdom and with proper ``nn.Module`` initialisation helpers.
+by the reference repo (GPLv3, see ``licenses/PyTorch-CycleGAN-LICENSE``) --
+rewritten without ``Variable`` or Visdom, with proper init helpers.
+Used by ``scripts/train_sim2real.py`` (which also covers plain unpaired
+domain transfer when no masks / temporal loss are requested).
 """
 
 from __future__ import annotations

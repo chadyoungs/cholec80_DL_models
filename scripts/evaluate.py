@@ -21,13 +21,13 @@ from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from cholec80.constants import PHASES  # noqa: E402
-from cholec80.data import ClipDataset, FrameDataset, build_transform, collate_clips, collate_frames  # noqa: E402
-from cholec80.evaluation import evaluate_frame_model, scalar_metrics  # noqa: E402
-from cholec80.inference import predict_video, score_loader  # noqa: E402
-from cholec80.metrics import aggregate_video_metrics, video_phase_metrics  # noqa: E402
-from cholec80.models import EndoNet, SlowFast, TemporalEndoNet  # noqa: E402
-from cholec80.utils import describe_device, dump_json, resolve_device  # noqa: E402
+from cholec80_dl.constants import PHASES  # noqa: E402
+from cholec80_dl.data import ClipDataset, FrameDataset, build_transform, collate_clips, collate_frames  # noqa: E402
+from cholec80_dl.evaluation import evaluate_frame_model, scalar_metrics  # noqa: E402
+from cholec80_dl.inference import predict_video, score_loader  # noqa: E402
+from cholec80_dl.metrics import aggregate_video_metrics, video_phase_metrics  # noqa: E402
+from cholec80_dl.models import EndoNet, SlowFast, TemporalEndoNet  # noqa: E402
+from cholec80_dl.utils import describe_device, dump_json, resolve_device  # noqa: E402
 
 
 def parse_args(argv=None):

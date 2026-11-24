@@ -1,15 +1,16 @@
 """Dataset for sim-to-real texture translation (domain A = simulation).
 
-DIFFERENCES VS. THE PLAIN CycleGAN DATASET (``cyclegan.py``)
-==========================================================
-``UnalignedImageDataset`` yields random (A, B) pairs and nothing else.
+DIFFERENCES VS. A PLAIN CycleGAN DATASET
+========================================
+A vanilla CycleGAN dataset yields random (A, B) pairs and nothing else
+(omit ``mask_dir`` and ``temporal`` here and you get exactly that).
 For sim-to-real we need three extra things, each with a reason:
 
 1. A PROTECTION MASK for every A frame (optional).
    The simulator knows exactly where instruments / semantically-labelled
    blood decals are.  We load that mask alongside the frame so the training
    loop can composite the original pixels back over the translation
-   (see ``cholec80.sim2real.blend_protected``).
+   (see ``cholec80_dl.sim2real.blend_protected``).
 
 2. A TEMPORAL PAIR (A_t, A_{t+1}) instead of a single A frame (optional).
    The temporal-consistency loss needs two consecutive frames of the SAME

@@ -1,6 +1,6 @@
 """Frame-level and short-sequence datasets.
 
-Both datasets consume the CSV index produced by ``cholec80.annotations.build_index``.
+Both datasets consume the CSV index produced by ``cholec80_dl.annotations.build_index``.
 Paths in that CSV are relative to ``frames_root``.
 """
 
@@ -123,7 +123,7 @@ class SequenceDataset(Dataset):
 
 
 # --------------------------------------------------------------------------- #
-# Collate functions (dict batches consumed by cholec80.engine.train_step)
+# Collate functions (dict batches consumed by cholec80_dl.engine.train_step)
 # --------------------------------------------------------------------------- #
 
 def collate_frames(batch: Sequence[tuple]) -> dict:

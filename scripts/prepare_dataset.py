@@ -26,7 +26,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from cholec80.annotations import (  # noqa: E402
+from cholec80_dl.annotations import (  # noqa: E402
     PHASES,
     TOOLS,
     build_index,
@@ -37,7 +37,7 @@ from cholec80.annotations import (  # noqa: E402
     split_videos,
     write_index,
 )
-from cholec80.utils import dump_json, setup_logging  # noqa: E402
+from cholec80_dl.utils import dump_json, setup_logging  # noqa: E402
 
 
 def parse_args(argv=None):

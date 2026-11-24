@@ -24,19 +24,19 @@ from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from cholec80.data import (  # noqa: E402
+from cholec80_dl.data import (  # noqa: E402
     FrameDataset,
     SequenceDataset,
     build_transform,
     collate_frames,
     collate_sequences,
 )
-from cholec80.engine import CheckpointManager, autocast, make_amp, resume_if_requested  # noqa: E402
-from cholec80.evaluation import evaluate_frame_model, scalar_metrics, split_outputs  # noqa: E402
-from cholec80.losses import EndoNetLoss, TemporalEndoNetLoss, tool_pos_weight  # noqa: E402
-from cholec80.metrics import PhaseMetrics  # noqa: E402
-from cholec80.models import EndoNet, TemporalEndoNet  # noqa: E402
-from cholec80.utils import (  # noqa: E402
+from cholec80_dl.engine import CheckpointManager, autocast, make_amp, resume_if_requested  # noqa: E402
+from cholec80_dl.evaluation import evaluate_frame_model, scalar_metrics, split_outputs  # noqa: E402
+from cholec80_dl.losses import EndoNetLoss, TemporalEndoNetLoss, tool_pos_weight  # noqa: E402
+from cholec80_dl.metrics import PhaseMetrics  # noqa: E402
+from cholec80_dl.models import EndoNet, TemporalEndoNet  # noqa: E402
+from cholec80_dl.utils import (  # noqa: E402
     CSVLogger,
     build_optimizer,
     count_parameters,
@@ -303,7 +303,7 @@ def main(argv=None) -> int:
 
     # ---- final report on the held-out test videos -------------------------
     if test_csv.exists():
-        from cholec80.utils import load_checkpoint
+        from cholec80_dl.utils import load_checkpoint
 
         load_checkpoint(run_dir / "checkpoints" / "best.pt", model, map_location=device)
         test_ds = ds_cls(pd.read_csv(test_csv), train=False, limit=limit, **common)

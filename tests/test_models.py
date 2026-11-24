@@ -5,9 +5,9 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from cholec80.losses import EndoNetLoss, SlowFastLoss, TemporalEndoNetLoss
-from cholec80.models import EndoNet, SlowFast, TemporalEndoNet
-from cholec80.models.slowfast import _inflate_conv
+from cholec80_dl.losses import EndoNetLoss, SlowFastLoss, TemporalEndoNetLoss
+from cholec80_dl.models import EndoNet, SlowFast, TemporalEndoNet
+from cholec80_dl.models.slowfast import _inflate_conv
 
 
 def test_endonet_forward_and_logits():

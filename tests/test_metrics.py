@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from cholec80.metrics import PhaseMetrics, ToolMetrics, average_precision, video_phase_metrics
+from cholec80_dl.metrics import PhaseMetrics, ToolMetrics, average_precision, video_phase_metrics
 
 
 def test_phase_metrics_perfect():

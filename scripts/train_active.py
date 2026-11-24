@@ -26,15 +26,15 @@ from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from cholec80.active_learning import ALPool, CandidateSet, STRATEGIES, query_indices  # noqa: E402
-from cholec80.data import FrameDataset, collate_frames  # noqa: E402
-from cholec80.engine import autocast, make_amp  # noqa: E402
-from cholec80.evaluation import evaluate_frame_model, scalar_metrics  # noqa: E402
-from cholec80.inference import mc_dropout_probs, score_loader  # noqa: E402
-from cholec80.losses import EndoNetLoss, tool_pos_weight  # noqa: E402
-from cholec80.metrics import PhaseMetrics  # noqa: E402
-from cholec80.models import EndoNet  # noqa: E402
-from cholec80.utils import (  # noqa: E402
+from cholec80_dl.active_learning import ALPool, CandidateSet, STRATEGIES, query_indices  # noqa: E402
+from cholec80_dl.data import FrameDataset, collate_frames  # noqa: E402
+from cholec80_dl.engine import autocast, make_amp  # noqa: E402
+from cholec80_dl.evaluation import evaluate_frame_model, scalar_metrics  # noqa: E402
+from cholec80_dl.inference import mc_dropout_probs, score_loader  # noqa: E402
+from cholec80_dl.losses import EndoNetLoss, tool_pos_weight  # noqa: E402
+from cholec80_dl.metrics import PhaseMetrics  # noqa: E402
+from cholec80_dl.models import EndoNet  # noqa: E402
+from cholec80_dl.utils import (  # noqa: E402
     AverageMeter,
     CSVLogger,
     build_optimizer,

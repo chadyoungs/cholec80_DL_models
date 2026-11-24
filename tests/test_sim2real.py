@@ -8,8 +8,8 @@ import numpy as np
 import torch
 from PIL import Image
 
-from cholec80.data import Sim2RealDataset
-from cholec80.sim2real import (
+from cholec80_dl.data import Sim2RealDataset
+from cholec80_dl.sim2real import (
     batch_flow_and_validity,
     blend_protected,
     compute_flow,

@@ -1,9 +1,8 @@
-"""Torch datasets for Cholec80 (frame, sequence, clip) plus CycleGAN pairs."""
+"""Torch datasets for Cholec80 (frame, sequence, clip) and sim2real pairs."""
 
 from .transforms import build_transform
 from .frames import FrameDataset, SequenceDataset, collate_frames, collate_sequences
 from .clips import ClipDataset, collate_clips
-from .cyclegan import UnalignedImageDataset
 from .sim2real import Sim2RealDataset
 
 __all__ = [
@@ -11,7 +10,6 @@ __all__ = [
     "FrameDataset",
     "SequenceDataset",
     "ClipDataset",
-    "UnalignedImageDataset",
     "Sim2RealDataset",
     "collate_frames",
     "collate_sequences",
